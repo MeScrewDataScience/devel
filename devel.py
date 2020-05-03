@@ -121,7 +121,8 @@ class FuturesTrade(webdriver.Chrome):
                           f'Error message: {e}')
                     pass
         
-        self.cancel_order(wait)
+        sleep(wait)
+        self.cancel_order()
 
         return
     
@@ -148,15 +149,12 @@ class FuturesTrade(webdriver.Chrome):
         return
     
 
-    def cancel_order(self, wait=10):
-        sleep(wait)
-        
+    def cancel_order(self):
         for contract in self.entry_strategies:
             self.cancel_single_order(contract)
             print(f'{self.client["name"]} - {self.client["username"]} - '
                   f'Entry order for contract {contract} is canceled '
-                  f'because of being unable to be filled after {wait} '
-                  'seconds of waiting')
+                  f'because of being unable to be filled.')
         
         return
 
@@ -402,8 +400,8 @@ class MultiAccTrade():
         return
     
 
-    def cancel_order(self, wait=10):
-        self._run_multithreads('cancel', wait)
+    def cancel_order(self):
+        self._run_multithreads('cancel')
 
         return
     
