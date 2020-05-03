@@ -29,46 +29,59 @@ class FuturesTrade(webdriver.Chrome):
     
 
     def login(self):
-        # Login
-        username_input = self.find_element_by_id('mvClientID')
-        password_input = self.find_element_by_id('mvPassword')
-        captcha = self.find_element_by_id('mainCaptcha')
-        captcha_input = self.find_element_by_id('securitycode')
-        login_button = self.find_element_by_id('loginOn')
 
-        captcha_text = captcha.text.replace(' ', '')
+        try:
+            # Login
+            username_input = self.find_element_by_id('mvClientID')
+            password_input = self.find_element_by_id('mvPassword')
+            captcha = self.find_element_by_id('mainCaptcha')
+            captcha_input = self.find_element_by_id('securitycode')
+            login_button = self.find_element_by_id('loginOn')
 
-        username_input.clear()
-        password_input.clear()
-        captcha_input.clear()
-        username_input.send_keys(str(self.client['username']))
-        password_input.send_keys(str(self.client['password']))
-        captcha_input.send_keys(captcha_text)
-        login_button.click()
+            captcha_text = captcha.text.replace(' ', '')
 
-        confirm_button = WebDriverWait(self, 5).until(
-            EC.presence_of_element_located((By.ID, 'btnAuthConfirm'))
-        )
-        # Client card verification
-        matrix1 = self.find_element_by_id('mvWordMatrixKey01')
-        matrix2 = self.find_element_by_id('mvWordMatrixKey02')
-        first_digit_input = self.find_element_by_id('wordMatrixValue01')
-        second_digit_input = self.find_element_by_id('wordMatrixValue02')
+            username_input.clear()
+            password_input.clear()
+            captcha_input.clear()
+            username_input.send_keys(str(self.client['username']))
+            password_input.send_keys(str(self.client['password']))
+            captcha_input.send_keys(captcha_text)
+            login_button.click()
+
+            # Verify client
+            self._verify_client()
         
-
-        matrix1 = matrix1.text.split(',')
-        matrix2 = matrix2.text.split(',')
-        first_digit = self.client['clientcard'].loc[int(matrix1[0]), matrix1[1]]
-        second_digit = self.client['clientcard'].loc[int(matrix2[0]), matrix2[1]]
-
-        first_digit_input.clear()
-        first_digit_input.send_keys(first_digit)
-        second_digit_input.clear()
-        second_digit_input.send_keys(second_digit)
-
-        confirm_button.click()
+        except:
+            sleep(0.5)
+            self.login()
 
         return
+    
+
+    def show_status(self):
+        status_table = self._get_status_table()
+        columns = [6, 7, 8, 9, 10, 11, 12, 13, 14, 22]
+        col_name = [
+            'Mã HĐ',
+            'Mua/Bán',
+            'Giá',
+            'Khối lượng',
+            'KL còn lại',
+            'KL khớp',
+            'Giá TB',
+            'Trạng thái',
+            'Loại lệnh',
+            'Thời gian GD'
+        ]
+        result_table = status_table.iloc[:, columns]
+        result_table.columns = col_name
+
+        print('-' * 80)
+        print('Client:', self.client["name"])
+        print(result_table)
+        print('-' * 80, end='\n\n')
+
+        return result_table
     
 
     def entry_order(self, entry_strategies, stoploss=True, wait=10):
@@ -81,10 +94,13 @@ class FuturesTrade(webdriver.Chrome):
                     entry_strategies[contract]['direction'],
                     entry_strategies[contract]['volume']
                 )
+                
+                # Verify client
+                self._verify_client()
 
             except Exception as e:
                 self.entry_strategies[contract]['entry_status'] = 'Failed'
-                print(f'Client {self.client["username"]} - '
+                print(f'{self.client["name"]} - {self.client["username"]} - '
                       f'Cannot place {entry_strategies[contract]["direction"]} order for {contract}. '
                       f'Error message: {e}')
                 pass
@@ -100,10 +116,12 @@ class FuturesTrade(webdriver.Chrome):
                     )
                 except Exception as e:
                     self.entry_strategies[contract]['stoploss_status'] = 'Failed'
-                    print(f'Client {self.client["username"]} - '
+                    print(f'{self.client["name"]} - {self.client["username"]} - '
                           f'Cannot place stop loss order for {contract}. '
                           f'Error message: {e}')
                     pass
+        
+        self.cancel_order(wait)
 
         return
     
@@ -122,7 +140,7 @@ class FuturesTrade(webdriver.Chrome):
                     exit_strategies[contract]['volume']
                 )
             except Exception as e:
-                print(f'Client {self.client["username"]} - '
+                print(f'{self.client["name"]} - {self.client["username"]} - '
                       f'Cannot place {exit_strategies[contract]["direction"]} order for {contract}. '
                       f'Error message: {e}')
                 continue
@@ -131,19 +149,14 @@ class FuturesTrade(webdriver.Chrome):
     
 
     def cancel_order(self, wait=10):
-        t0 = time()
-
-        while time() - t0 < wait:
-            for contract in self.entry_strategies:
-                self.entry_strategies[contract]['entry_status'] = self.check_status(contract)
+        sleep(wait)
         
         for contract in self.entry_strategies:
-            if self.entry_strategies[contract]['entry_status'] == 'Pending':
-                self.cancel_single_order(contract)
-                print(f'Client {self.client["username"]} -'
-                      f'Entry order for contract {contract} is canceled '
-                      f'because of being unable to be filled after {wait} '
-                      'seconds of waiting')
+            self.cancel_single_order(contract)
+            print(f'{self.client["name"]} - {self.client["username"]} - '
+                  f'Entry order for contract {contract} is canceled '
+                  f'because of being unable to be filled after {wait} '
+                  'seconds of waiting')
         
         return
 
@@ -162,7 +175,7 @@ class FuturesTrade(webdriver.Chrome):
                     stoploss_strategies[contract]['stoploss2']
                 )
             except Exception as e:
-                print(f'Client {self.client["username"]} - '
+                print(f'{self.client["name"]} - {self.client["username"]} - '
                       f'Cannot place stop loss order for {contract}. Error message: {e}')
                 continue
         
@@ -193,18 +206,12 @@ class FuturesTrade(webdriver.Chrome):
         elif direction == 'short':
             short_order.click()
         else:
-            raise ValueError(f'Client {self.client["username"]} - Direction must be either long or short')
+            raise ValueError(f'{self.client["name"]} - {self.client["username"]} - '
+                             'Direction must be either long or short')
         
         sleep(0.5)
         
         return self.check_status(contract)
-    
-
-    def cancel_single_order(self, contract):
-        cancel_button = self.find_element_by_id(f'abc{contract}')
-        cancel_button.click()
-
-        return
 
     
     def place_single_stoploss(self, contract, direction, volume, stoploss1, stoploss2):
@@ -215,7 +222,7 @@ class FuturesTrade(webdriver.Chrome):
             status = self.check_status(contract)
         except Exception as e:
             status = 'Error'
-            print(f'{self.client["username"]} - {e}')
+            print(f'{self.client["name"]} - {self.client["username"]} - {e}')
         
         if status == 'Matched':
 
@@ -227,7 +234,8 @@ class FuturesTrade(webdriver.Chrome):
                 stoploss_order = self.find_element_by_id('bTab')
                 action_button = self.find_element_by_id('enterBuy')
             else:
-                raise ValueError(f'Client {self.client["username"]} - Direction must be either long or short')
+                raise ValueError(f'{self.client["name"]} - {self.client["username"]} - '
+                                 'Direction must be either long or short')
             
             stoploss_order.click()
 
@@ -254,22 +262,44 @@ class FuturesTrade(webdriver.Chrome):
             action_button.click()
         
         else:
-            print(f'Client {self.client["username"]} - Cannot place a '
-                  f'stop loss because the {direction} '
+            print(f'{self.client["name"]} - {self.client["username"]} - '
+                  f'Cannot place a stop loss because the {direction} '
                    'order has not been filled yet')
+
+        return
+    
+
+    def cancel_single_order(self, contract):
+        try:
+            status = self.check_status(contract)
+            self.entry_strategies[contract]['entry_status'] = status
+        except Exception as e:
+            print(f'{self.client["name"]} - {self.client["username"]} - {e}')
+        
+        if self.entry_strategies[contract]['entry_status'] == 'Pending':
+            status_table = self._get_status_table()
+            contract_index = self._get_contract_index(contract, status_table)
+            contract_index += 1
+            button_xpath = f'//*[@id="grdTodayHis"]/tr[{contract_index}]/td[3]/button'
+            cancel_button = self.find_element_by_xpath(button_xpath)
+            cancel_button.click()
+
+            sleep(0.01)
+            
+            confirm_button = self.find_element_by_id('cmBtnConfirmed')
+            confirm_button.click()
 
         return
     
 
     def check_status(self, contract):
         self.refresh()
+        sleep(0.1)
 
-        page_source = self.page_source
-        status_table = pd.read_html(page_source)[6]
-
-        contract_verify = status_table.iloc[:, 6].str.replace(' ', '') == contract
-        status = status_table.iloc[:, 13][contract_verify]
-        status = status[0].replace(' ', '')
+        status_table = self._get_status_table()
+        contract_index = self._get_contract_index(contract, status_table)
+        status = status_table.iloc[contract_index, 13]
+        status = status.replace(' ', '')
 
         if status == 'Khớp':
             status = 'Matched'
@@ -277,12 +307,65 @@ class FuturesTrade(webdriver.Chrome):
             status = 'Canceled'
         else:
             status = 'Pending'
-        
+                
         return status
     
 
     def reload_entry_strategies(self, entry_strategies):
         self.entry_strategies = entry_strategies
+
+        return
+    
+
+    def update_client_info(self, client_info):
+        self.client = client_info
+
+        return
+    
+
+    def _get_contract_index(self, status_table, contract):
+        contract_verify = status_table.iloc[:, 6].str.replace(' ', '') == contract
+        contract_index = contract_verify[contract_verify == True].index[0]
+        
+        return contract_index
+    
+
+    def _get_status_table(self, attempts=3):
+        try:
+            page_source = self.page_source
+            status_table = pd.read_html(page_source)[6]
+        except Exception as e:
+            if attempts >= 0:
+                sleep(0.1)
+                self._get_status_table(attempts-1)
+            else:
+                raise ValueError(e)
+
+        return status_table
+    
+
+    def _verify_client(self):
+        confirm_button = WebDriverWait(self, 5).until(
+            EC.presence_of_element_located((By.ID, 'btnAuthConfirm'))
+        )
+        
+        matrix1 = self.find_element_by_id('mvWordMatrixKey01')
+        matrix2 = self.find_element_by_id('mvWordMatrixKey02')
+        first_digit_input = self.find_element_by_id('wordMatrixValue01')
+        second_digit_input = self.find_element_by_id('wordMatrixValue02')
+        
+
+        matrix1 = matrix1.text.split(',')
+        matrix2 = matrix2.text.split(',')
+        first_digit = self.client['clientcard'].loc[int(matrix1[0]), matrix1[1]]
+        second_digit = self.client['clientcard'].loc[int(matrix2[0]), matrix2[1]]
+
+        first_digit_input.clear()
+        first_digit_input.send_keys(first_digit)
+        second_digit_input.clear()
+        second_digit_input.send_keys(second_digit)
+
+        confirm_button.click()
 
         return
 
@@ -306,10 +389,22 @@ class MultiAccTrade():
         
         return
     
+
+    def show_status(self):
+        self._run_multithreads('show_status')
+
+        return
+    
     
     def entry_order(self, entry_strategies):
         self._run_multithreads('entry', entry_strategies)
         
+        return
+    
+
+    def cancel_order(self, wait=10):
+        self._run_multithreads('cancel', wait)
+
         return
     
     
@@ -337,6 +432,12 @@ class MultiAccTrade():
         return
     
 
+    def update_client_info(self, client_info):
+        self._run_multithreads('update_client', client_info)
+
+        return
+    
+
     def _run_multithreads(self, *args):
         threads = {}
         
@@ -357,15 +458,21 @@ class MultiAccTrade():
         if method == 'login':
             instance.load_website()
             instance.login()
+        elif method == 'show_status':
+            instance.show_status(*args)
         elif method == 'entry':
             instance.entry_order(*args)
         elif method == 'exit':
             instance.exit_order(*args)
         elif method == 'stoploss':
             instance.place_stoploss(*args)
+        elif method == 'cancel':
+            instance.entry_order(*args)
         elif method == 'close':
             instance.close()
         elif method == 'reload_strategies':
             instance.reload_entry_strategies(*args)
+        elif method == 'update_client':
+            instance.update_client_info(*args)
         
         return
