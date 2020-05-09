@@ -100,7 +100,7 @@ class FuturesTrade(webdriver.Chrome):
             except Exception as e:
                 self.entry_strategies[contract]['entry_status'] = 'Failed'
                 print(f'{self.client["name"]} - {self.client["username"]} - '
-                      f'Cannot place {entry_strategies[contract]["direction"]} order for {contract}. '
+                      f'Could not place {entry_strategies[contract]["direction"]} order for {contract}. '
                       f'Error message: {e}')
                 pass
             
@@ -116,7 +116,7 @@ class FuturesTrade(webdriver.Chrome):
                 except Exception as e:
                     self.entry_strategies[contract]['stoploss_status'] = 'Failed'
                     print(f'{self.client["name"]} - {self.client["username"]} - '
-                          f'Cannot place stop loss order for {contract}. '
+                          f'Could not place stop loss order for {contract}. '
                           f'Error message: {e}')
                     pass
         
@@ -141,7 +141,7 @@ class FuturesTrade(webdriver.Chrome):
                 )
             except Exception as e:
                 print(f'{self.client["name"]} - {self.client["username"]} - '
-                      f'Cannot place {exit_strategies[contract]["direction"]} order for {contract}. '
+                      f'Could not place {exit_strategies[contract]["direction"]} order for {contract}. '
                       f'Error message: {e}')
                 continue
         
@@ -173,7 +173,7 @@ class FuturesTrade(webdriver.Chrome):
                 )
             except Exception as e:
                 print(f'{self.client["name"]} - {self.client["username"]} - '
-                      f'Cannot place stop loss order for {contract}. Error message: {e}')
+                      f'Could not place stop loss order for {contract}. Error message: {e}')
                 continue
         
         return
@@ -215,11 +215,7 @@ class FuturesTrade(webdriver.Chrome):
         self.refresh()
 
         # Check status
-        try:
-            status = self.check_status(contract)
-        except Exception as e:
-            status = 'Error'
-            print(f'{self.client["name"]} - {self.client["username"]} - {e}')
+        status = self.check_status(contract)
         
         if status == 'Matched':
 
@@ -260,22 +256,19 @@ class FuturesTrade(webdriver.Chrome):
         
         else:
             print(f'{self.client["name"]} - {self.client["username"]} - '
-                  f'Cannot place a stop loss because the {direction} '
+                  f'Could not place a stop loss because the {direction} '
                    'order has not been filled yet')
 
         return
     
 
     def cancel_single_order(self, contract):
-        try:
-            status = self.check_status(contract)
-            self.entry_strategies[contract]['entry_status'] = status
-        except Exception as e:
-            print(f'{self.client["name"]} - {self.client["username"]} - {e}')
+        status = self.check_status(contract)
+        self.entry_strategies[contract]['entry_status'] = status
         
         if self.entry_strategies[contract]['entry_status'] == 'Pending':
             status_table = self._get_status_table()
-            contract_index = self._get_contract_index(contract, status_table)
+            contract_index = self._get_contract_index(status_table, contract)
             contract_index += 1
             button_xpath = f'//*[@id="grdTodayHis"]/tr[{contract_index}]/td[3]/button'
             cancel_button = self.find_element_by_xpath(button_xpath)
@@ -293,17 +286,22 @@ class FuturesTrade(webdriver.Chrome):
         self.refresh()
         sleep(0.1)
 
-        status_table = self._get_status_table()
-        contract_index = self._get_contract_index(contract, status_table)
-        status = status_table.iloc[contract_index, 13]
-        status = status.replace(' ', '')
+        try:
+            status_table = self._get_status_table()
+            contract_index = self._get_contract_index(status_table, contract)
+            status = status_table.iloc[contract_index, 13]
+            status = status.replace(' ', '')
 
-        if status == 'Khớp':
-            status = 'Matched'
-        elif status == 'Hủy':
-            status = 'Canceled'
-        else:
-            status = 'Pending'
+            if status == 'Khớp':
+                status = 'Matched'
+            elif status == 'Hủy':
+                status = 'Canceled'
+            else:
+                status = 'Pending'
+        
+        except Exception as e:
+            print(f'{self.client["name"]} - {self.client["username"]} - {e}')
+            status = 'Error'
                 
         return status
     
@@ -321,8 +319,12 @@ class FuturesTrade(webdriver.Chrome):
     
 
     def _get_contract_index(self, status_table, contract):
-        contract_verify = status_table.iloc[:, 6].str.replace(' ', '') == contract
-        contract_index = contract_verify[contract_verify == True].index[0]
+        try:
+            contract_verify = status_table.iloc[:, 6].str.replace(' ', '') == contract
+            contract_index = contract_verify[contract_verify == True].index[0]
+        except:
+            msg = f'Could not find contract {contract} in list of current trades'
+            raise ValueError(msg)
         
         return contract_index
     
