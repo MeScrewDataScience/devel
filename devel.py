@@ -333,14 +333,15 @@ class FuturesTrade(webdriver.Chrome):
         try:
             page_source = self.page_source
             status_table = pd.read_html(page_source)[6]
+
+            return status_table
+        
         except Exception as e:
             if attempts >= 0:
                 sleep(0.1)
                 self._get_status_table(attempts-1)
             else:
                 raise ValueError(e)
-
-        return status_table
     
 
     def _verify_client(self):
