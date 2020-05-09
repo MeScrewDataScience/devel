@@ -29,7 +29,6 @@ class FuturesTrade(webdriver.Chrome):
     
 
     def login(self):
-
         try:
             # Login
             username_input = self.find_element_by_id('mvClientID')
